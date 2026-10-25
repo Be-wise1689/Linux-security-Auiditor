@@ -25,12 +25,12 @@ def test_finding_structure():
     assert item["evidence"] == "Evidence"
 
 
-def test_scanner_returns_four_checks():
+def test_scanner_returns_eighthecks():
     result = run_security_checks()
 
     assert result["scanner"] == "Linux Security Configuration Auditor"
-    assert result["checks_run"] == 4
-    assert len(result["findings"]) == 4
+    assert result["checks_run"] == 8
+    assert len(result["findings"]) == 8
 
 
 def test_scanner_statuses_are_valid():
@@ -80,7 +80,7 @@ def test_scan_endpoint():
     assert response.status_code == 200
 
     data = response.json()
-    assert data["checks_run"] == 4
+    assert data["checks_run"] == 8
     assert "scanned_at" in data
 
 
