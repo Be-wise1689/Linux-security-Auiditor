@@ -89,3 +89,38 @@ def test_homepage():
 
     assert response.status_code == 200
     assert "Linux Security Configuration Auditor" in response.text
+
+def test_read_apt_setting_missing_file(tmp_path):
+    missing_file = tmp_path / "missing.conf"
+
+    assert read_apt_setting(
+        str(missing_file),
+        "APT::Periodic::Update-Package-Lists",
+    ) is None
+
+
+def test_run_command_missing_executable():
+    from app.scanner.checks import run_command
+
+    assert run_command(
+        ["definitely-not-a-real-command-12345"]
+    ) is None
+
+
+def test_scanner_summary_has_all_statuses():
+    result = run_security_checks()
+
+    assert set(result["summary"]) == {
+        "pass",
+        "fail",
+        "review",
+        "unknown",
+    }
+
+
+def test_scanner_version_is_present():
+    result = run_security_checks()
+
+    assert result["version"]
+    assert result["checks_run"] == len(result["findings"])
+
