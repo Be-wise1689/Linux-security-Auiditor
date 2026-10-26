@@ -261,4 +261,29 @@ def test_sensitive_file_permissions_unknown_when_file_unavailable(monkeypatch):
     assert result["check_id"] == "LINUX-005"
     assert result["status"] == "UNKNOWN"
     assert "Could not inspect" in result["evidence"]
+def test_shadow_world_readable_permissions_fail(monkeypatch):
+    from types import SimpleNamespace
+    from app.scanner.checks import check_sensitive_file_permissions
+
+    class FakePath:
+        def __init__(self, name):
+            self.name = name
+
+        def stat(self):
+            mode = 0o644 if self.name == "/etc/shadow" else 0o644
+            return SimpleNamespace(
+                st_mode=mode,
+                st_uid=0,
+            )
+
+    monkeypatch.setattr(
+        "app.scanner.checks.Path",
+        FakePath,
+    )
+
+    result = check_sensitive_file_permissions()
+
+    assert result["check_id"] == "LINUX-005"
+    assert result["status"] == "FAIL"
+    assert "/etc/shadow" in result["evidence"]
 
