@@ -221,45 +221,78 @@ def check_sensitive_file_permissions() -> dict:
     details = []
 
     for name in paths:
-        path = Path(name)
         try:
-            info = path.stat()
+            info = Path(name).stat()
         except OSError:
             return finding(
-                "LINUX-005", "Sensitive file permissions", "UNKNOWN", "MEDIUM",
+                "LINUX-005",
+                "Sensitive file permissions",
+                "UNKNOWN",
+                "MEDIUM",
                 f"Could not inspect {name}.",
                 "Check that the file exists and can be inspected with appropriate permissions.",
             )
 
         mode = info.st_mode & 0o777
         owner = info.st_uid
-        details.append(f"{name}: mode={mode:04o}, owner_uid={owner}")
+        details.append(
+            f"{name}: mode={mode:04o}, owner_uid={owner}"
+        )
 
         if owner != 0:
             return finding(
-                "LINUX-005", "Sensitive file permissions", "REVIEW", "HIGH",
-                "; ".join(details) + f"; {name} is not owned by root.",
+                "LINUX-005",
+                "Sensitive file permissions",
+                "REVIEW",
+                "HIGH",
+                "; ".join(details)
+                + f"; {name} is not owned by root.",
                 "Investigate unexpected ownership and compare with distribution security guidance.",
             )
 
-        if name == "/etc/passwd" and mode & 0o022:
-            return finding(
-                "LINUX-005", "Sensitive file permissions", "FAIL", "HIGH",
-                "; ".join(details) + "; /etc/passwd is group- or world-writable.",
-                "Review and correct permissions using your distribution's documented defaults.",
-            )
+        if name == "/etc/passwd":
+            if mode & 0o022:
+                return finding(
+                    "LINUX-005",
+                    "Sensitive file permissions",
+                    "FAIL",
+                    "HIGH",
+                    "; ".join(details)
+                    + "; /etc/passwd is group- or world-writable.",
+                    "Investigate the writable permissions and compare them with distribution security guidance.",
+                )
 
-        if name == "/etc/shadow" and mode & 0o037:
-            return finding(
-                "LINUX-005", "Sensitive file permissions", "FAIL", "HIGH",
-                "; ".join(details) + "; /etc/shadow has broader permissions than expected.",
-                "Review shadow-file permissions and compare them with distribution defaults.",
-            )
+        elif name == "/etc/shadow":
+            if mode & 0o007:
+                return finding(
+                    "LINUX-005",
+                    "Sensitive file permissions",
+                    "FAIL",
+                    "HIGH",
+                    "; ".join(details)
+                    + "; /etc/shadow grants permissions to other users.",
+                    "Restrict access to /etc/shadow according to distribution security guidance.",
+                )
+
+            if mode & 0o020:
+                return finding(
+                    "LINUX-005",
+                    "Sensitive file permissions",
+                    "FAIL",
+                    "HIGH",
+                    "; ".join(details)
+                    + "; /etc/shadow is group-writable.",
+                    "Investigate group-write access and compare with distribution security guidance.",
+                )
 
     return finding(
-        "LINUX-005", "Sensitive file permissions", "PASS", "INFO",
-        "; ".join(details) + "; basic ownership and permission checks passed.",
-        "Continue monitoring sensitive account files and compare their permissions with distribution guidance.",
+        "LINUX-005",
+        "Sensitive file permissions",
+        "PASS",
+        "INFO",
+        "; ".join(details)
+        + "; ownership and selected permission checks passed.",
+        "Continue monitoring sensitive account files and compare their permissions with distribution security guidance.",
     )
 
 

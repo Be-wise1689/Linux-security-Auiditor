@@ -159,3 +159,106 @@ def test_firewall_returns_unknown_when_tools_missing(monkeypatch):
     assert result["status"] == "UNKNOWN"
     assert result["evidence"]
     assert result["recommendation"]
+def test_sensitive_file_permissions_pass_when_files_are_secure(monkeypatch):
+    from types import SimpleNamespace
+    from app.scanner.checks import check_sensitive_file_permissions
+
+    class FakePath:
+        def __init__(self, name):
+            self.name = name
+
+        def stat(self):
+            modes = {
+                "/etc/passwd": 0o644,
+                "/etc/shadow": 0o640,
+            }
+            return SimpleNamespace(
+                st_mode=modes[self.name],
+                st_uid=0,
+            )
+
+    monkeypatch.setattr(
+        "app.scanner.checks.Path",
+        FakePath,
+    )
+
+    result = check_sensitive_file_permissions()
+
+    assert result["check_id"] == "LINUX-005"
+    assert result["status"] == "PASS"
+
+
+def test_sensitive_file_permissions_fail_when_passwd_is_writable(monkeypatch):
+    from types import SimpleNamespace
+    from app.scanner.checks import check_sensitive_file_permissions
+
+    class FakePath:
+        def __init__(self, name):
+            self.name = name
+
+        def stat(self):
+            mode = 0o666 if self.name == "/etc/passwd" else 0o640
+            return SimpleNamespace(
+                st_mode=mode,
+                st_uid=0,
+            )
+
+    monkeypatch.setattr(
+        "app.scanner.checks.Path",
+        FakePath,
+    )
+
+    result = check_sensitive_file_permissions()
+
+    assert result["check_id"] == "LINUX-005"
+    assert result["status"] == "FAIL"
+    assert "/etc/passwd" in result["evidence"]
+
+
+def test_sensitive_file_permissions_review_when_shadow_not_root_owned(monkeypatch):
+    from types import SimpleNamespace
+    from app.scanner.checks import check_sensitive_file_permissions
+
+    class FakePath:
+        def __init__(self, name):
+            self.name = name
+
+        def stat(self):
+            owner = 1000 if self.name == "/etc/shadow" else 0
+            mode = 0o644 if self.name == "/etc/passwd" else 0o640
+            return SimpleNamespace(
+                st_mode=mode,
+                st_uid=owner,
+            )
+
+    monkeypatch.setattr(
+        "app.scanner.checks.Path",
+        FakePath,
+    )
+
+    result = check_sensitive_file_permissions()
+
+    assert result["check_id"] == "LINUX-005"
+    assert result["status"] == "REVIEW"
+    assert "not owned by root" in result["evidence"]
+def test_sensitive_file_permissions_unknown_when_file_unavailable(monkeypatch):
+    from app.scanner.checks import check_sensitive_file_permissions
+
+    class FakePath:
+        def __init__(self, name):
+            self.name = name
+
+        def stat(self):
+            raise PermissionError("Access denied")
+
+    monkeypatch.setattr(
+        "app.scanner.checks.Path",
+        FakePath,
+    )
+
+    result = check_sensitive_file_permissions()
+
+    assert result["check_id"] == "LINUX-005"
+    assert result["status"] == "UNKNOWN"
+    assert "Could not inspect" in result["evidence"]
+
