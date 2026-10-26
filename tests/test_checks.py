@@ -286,4 +286,129 @@ def test_shadow_world_readable_permissions_fail(monkeypatch):
     assert result["check_id"] == "LINUX-005"
     assert result["status"] == "FAIL"
     assert "/etc/shadow" in result["evidence"]
+def test_ssh_root_login_passes_when_restricted(monkeypatch):
+    from app.scanner.checks import check_ssh_setting
 
+    monkeypatch.setattr(
+        "app.scanner.checks.shutil.which",
+        lambda command: "/usr/sbin/sshd",
+    )
+
+    monkeypatch.setattr(
+        "app.scanner.checks.run_command",
+        lambda command: "permitrootlogin no",
+    )
+
+    result = check_ssh_setting(
+        "permitrootlogin",
+        "LINUX-002",
+        "SSH root login restriction",
+    )
+
+    assert result["status"] == "PASS"
+    assert "permitrootlogin: no" in result["evidence"].lower()
+
+
+def test_ssh_root_login_fails_when_permitted(monkeypatch):
+    from app.scanner.checks import check_ssh_setting
+
+    monkeypatch.setattr(
+        "app.scanner.checks.shutil.which",
+        lambda command: "/usr/sbin/sshd",
+    )
+
+    monkeypatch.setattr(
+        "app.scanner.checks.run_command",
+        lambda command: "permitrootlogin yes",
+    )
+
+    result = check_ssh_setting(
+        "permitrootlogin",
+        "LINUX-002",
+        "SSH root login restriction",
+    )
+
+    assert result["status"] == "FAIL"
+    assert "permitrootlogin: yes" in result["evidence"].lower()
+
+
+def test_ssh_setting_unknown_when_server_unavailable(monkeypatch):
+    from app.scanner.checks import check_ssh_setting
+
+    monkeypatch.setattr(
+        "app.scanner.checks.shutil.which",
+        lambda command: None,
+    )
+
+    result = check_ssh_setting(
+        "permitrootlogin",
+        "LINUX-002",
+        "SSH root login restriction",
+    )
+
+    assert result["status"] == "UNKNOWN"
+    assert "sshd" in result["evidence"].lower()
+def test_firewall_passes_when_ufw_is_active(monkeypatch):
+    from app.scanner import checks
+
+    monkeypatch.setattr(
+        checks.shutil, "which",
+        lambda name: "/usr/sbin/ufw" if name == "ufw" else None,
+    )
+    monkeypatch.setattr(
+        checks, "run_command",
+        lambda command: "Status: active\nLogging: on",
+    )
+
+    result = checks.check_firewall()
+
+    assert result["status"] == "PASS"
+    assert result["check_id"] == "LINUX-001"
+    assert "active" in result["evidence"].lower()
+
+
+def test_firewall_reviews_when_ufw_is_inactive(monkeypatch):
+    from app.scanner import checks
+
+    monkeypatch.setattr(
+        checks.shutil, "which",
+        lambda name: "/usr/sbin/ufw" if name == "ufw" else None,
+    )
+    monkeypatch.setattr(
+        checks, "run_command",
+        lambda command: "Status: inactive",
+    )
+
+    result = checks.check_firewall()
+
+    assert result["status"] == "REVIEW"
+    assert "another firewall" in result["evidence"].lower()
+
+
+def test_firewall_reviews_when_nftables_rules_are_visible(monkeypatch):
+    from app.scanner import checks
+
+    monkeypatch.setattr(
+        checks.shutil, "which",
+        lambda name: "/usr/sbin/nft" if name == "nft" else None,
+    )
+    monkeypatch.setattr(
+        checks, "run_command",
+        lambda command: "table inet filter {\n chain input {\n }\n}",
+    )
+
+    result = checks.check_firewall()
+
+    assert result["status"] == "REVIEW"
+    assert "effectiveness has not been evaluated" in result["evidence"].lower()
+
+
+def test_firewall_unknown_when_no_supported_tools_are_available(monkeypatch):
+    from app.scanner import checks
+
+    monkeypatch.setattr(checks.shutil, "which", lambda name: None)
+
+    result = checks.check_firewall()
+
+    assert result["status"] == "UNKNOWN"
+    assert result["check_id"] == "LINUX-001"
