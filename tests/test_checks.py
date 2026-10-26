@@ -348,7 +348,7 @@ def test_ssh_setting_unknown_when_server_unavailable(monkeypatch):
 
     assert result["status"] == "UNKNOWN"
     assert "sshd" in result["evidence"].lower()
-def test_firewall_passes_when_ufw_is_active(monkeypatch):
+def test_firewall_reviews_when_ufw_is_active(monkeypatch):
     from app.scanner import checks
 
     monkeypatch.setattr(
@@ -362,9 +362,10 @@ def test_firewall_passes_when_ufw_is_active(monkeypatch):
 
     result = checks.check_firewall()
 
-    assert result["status"] == "PASS"
+    assert result["status"] == "REVIEW"
     assert result["check_id"] == "LINUX-001"
     assert "active" in result["evidence"].lower()
+    assert "not been evaluated" in result["evidence"].lower()
 
 
 def test_firewall_reviews_when_ufw_is_inactive(monkeypatch):
@@ -412,3 +413,25 @@ def test_firewall_unknown_when_no_supported_tools_are_available(monkeypatch):
 
     assert result["status"] == "UNKNOWN"
     assert result["check_id"] == "LINUX-001"
+def test_firewalld_running_returns_review(monkeypatch):
+    from app.scanner import checks
+
+    monkeypatch.setattr(
+        checks.shutil, "which",
+        lambda name: "/usr/bin/firewall-cmd"
+        if name == "firewall-cmd" else None,
+    )
+
+    def fake_run_command(command):
+        if command == ["firewall-cmd", "--state"]:
+            return "running"
+        return None
+
+    monkeypatch.setattr(checks, "run_command", fake_run_command)
+
+    result = checks.check_firewall()
+
+    assert result["status"] == "REVIEW"
+    assert result["check_id"] == "LINUX-001"
+    assert "firewalld is running" in result["evidence"].lower()
+    assert "not been evaluated" in result["evidence"].lower()

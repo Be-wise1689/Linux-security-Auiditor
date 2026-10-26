@@ -54,10 +54,10 @@ def check_firewall() -> dict:
 
             if first_line == "status: active":
                 return finding(
-                    "LINUX-001", "Host firewall", "PASS", "INFO",
-                    "UFW reports an active firewall.",
-                    "Review active rules periodically and verify they match security policy.",
-                )
+                    "LINUX-001", "Host firewall", "REVIEW", "MEDIUM",
+                    "UFW reports an active firewall; rule effectiveness has not been evaluated.",
+                    "Inspect the active rules, default policies, allowed traffic, and IPv6 configuration.",
+           )
 
             if first_line == "status: inactive":
                 return finding(
@@ -70,10 +70,10 @@ def check_firewall() -> dict:
         state = run_command(["firewall-cmd", "--state"])
         if state == "running":
             return finding(
-                "LINUX-001", "Host firewall", "PASS", "INFO",
-                "firewalld reports that it is running.",
-                "Review active zones and rules.",
-            )
+                "LINUX-001", "Host firewall", "REVIEW", "MEDIUM",
+                "firewalld is running; active zones and rule effectiveness have not been evaluated.",
+                "Inspect active zones, firewall rules, default policies, and allowed traffic.",
+         )
 
     if shutil.which("nft"):
         output = run_command(["nft", "list", "ruleset"])
