@@ -123,4 +123,39 @@ def test_scanner_version_is_present():
 
     assert result["version"]
     assert result["checks_run"] == len(result["findings"])
+def test_run_command_nonzero_exit():
+    from app.scanner.checks import run_command
 
+    result = run_command([
+        "python3",
+        "-c",
+        "import sys; sys.exit(1)",
+    ])
+
+    assert result is None
+
+
+def test_run_command_timeout():
+    from app.scanner.checks import run_command
+
+    result = run_command([
+        "python3",
+        "-c",
+        "import time; time.sleep(10)",
+    ])
+
+    assert result is None
+def test_firewall_returns_unknown_when_tools_missing(monkeypatch):
+    from app.scanner.checks import check_firewall
+
+    monkeypatch.setattr(
+        "app.scanner.checks.shutil.which",
+        lambda command: None,
+    )
+
+    result = check_firewall()
+
+    assert result["check_id"] == "LINUX-001"
+    assert result["status"] == "UNKNOWN"
+    assert result["evidence"]
+    assert result["recommendation"]
