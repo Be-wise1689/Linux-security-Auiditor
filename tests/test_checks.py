@@ -330,7 +330,27 @@ def test_ssh_root_login_fails_when_permitted(monkeypatch):
 
     assert result["status"] == "FAIL"
     assert "permitrootlogin: yes" in result["evidence"].lower()
+def test_ssh_root_login_requires_review_when_passwords_prohibited(monkeypatch):
+    from app.scanner.checks import check_ssh_setting
 
+    monkeypatch.setattr(
+        "app.scanner.checks.shutil.which",
+        lambda command: "/usr/sbin/sshd",
+    )
+
+    monkeypatch.setattr(
+        "app.scanner.checks.run_command",
+        lambda command: "permitrootlogin prohibit-password",
+    )
+
+    result = check_ssh_setting(
+        "permitrootlogin",
+        "LINUX-002",
+        "SSH root login restriction",
+    )
+
+    assert result["status"] == "REVIEW"
+    assert "permitrootlogin: prohibit-password" in result["evidence"].lower()
 
 def test_ssh_setting_unknown_when_server_unavailable(monkeypatch):
     from app.scanner.checks import check_ssh_setting

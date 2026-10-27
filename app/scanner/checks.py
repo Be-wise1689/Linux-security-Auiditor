@@ -139,12 +139,24 @@ def check_ssh_setting(setting: str, check_id: str, title: str) -> dict:
         )
 
     if setting == "permitrootlogin":
-        passed = value in {"no", "prohibit-password", "without-password"}
-        recommendation = (
-            "Maintain restricted direct root SSH access."
-            if passed else
-            "Review and restrict direct root SSH access where appropriate."
-        )
+        if value == "no":
+            return finding(
+                check_id, title, "PASS", "INFO",
+                f"Effective {setting}: {value}",
+                "Maintain the restriction on direct root SSH access.",
+            )
+
+        if value in {"prohibit-password", "without-password"}:
+            return finding(
+                check_id, title, "REVIEW", "MEDIUM",
+                f"Effective {setting}: {value}. Password-based root login is restricted, "
+                "but public-key root login may still be allowed.",
+                "Review whether direct root SSH access is required. Prefer disabling it "
+                "with PermitRootLogin no when appropriate for your access policy.",
+           )
+
+        passed = False
+        recommendation = "Review and restrict direct root SSH access where appropriate."
     elif setting == "passwordauthentication":
         passed = value == "no"
         recommendation = (
